@@ -37,7 +37,7 @@ data <- read.csv("C:/Users/25094/Desktop/skills/project2/dataset05.csv", strings
 
 ```{r}
 #| label: data tidy
-# 转换分类变量
+# 转换分类变量 111111111111
 data <- data %>%
   mutate(
     Region = as.factor(Region),
