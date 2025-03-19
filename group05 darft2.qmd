@@ -1,0 +1,358 @@
+---
+title: "Analysis of Factors Influencing Household Size in the Philippines"
+author: "Group 5"
+number-sections: true
+format: 
+  html:
+    embed-resources: true
+    code-tools: true
+  pdf: default
+editor_options: 
+  chunk_output_type: console
+execute:
+  echo: true
+  eval: true
+  warning: false
+  message: false
+---
+
+# Data Tidy
+
+```{r}
+#| label: libraries
+library(tidyverse)    # 数据操作
+library(MASS)         # 负二项回归
+library(AER)          # 过度离散检验
+library(caret)        # 数据分割
+library(knitr)        # 生成表格
+library(performance)  # 模型评估
+library(ggplot2)      # 可视化
+library(dplyr)
+```
+
+```{r}
+#| label: data
+data <- read.csv("C:/Users/25094/Desktop/skills/project2/dataset05.csv", stringsAsFactors = FALSE)
+```
+
+```{r}
+#| label: data tidy
+# 转换分类变量
+data <- data %>%
+  mutate(
+    Region = as.factor(Region),
+    Household.Head.Sex = as.factor(Household.Head.Sex),
+    Type.of.Household = as.factor(Type.of.Household),
+    Electricity = as.factor(Electricity)
+  )
+
+# 确保数值变量格式正确
+data <- data %>%
+  mutate(
+    Total.Household.Income = as.numeric(Total.Household.Income),
+    Total.Food.Expenditure = as.numeric(Total.Food.Expenditure),
+    Household.Head.Age = as.numeric(Household.Head.Age),
+    Total.Number.of.Family.members = as.numeric(Total.Number.of.Family.members),
+    House.Floor.Area = as.numeric(House.Floor.Area),
+    House.Age = as.numeric(House.Age),
+    Number.of.bedrooms = as.numeric(Number.of.bedrooms)
+  )
+# 检查数据摘要
+summary(data)
+
+# 检查缺失值
+cat("Number of missing values:", sum(is.na(data)), "\n")
+```
+
+```{r}
+#| label: data-scaling
+# 对连续变量进行标准化
+data_scaled <- data %>%
+  mutate(
+    Total.Household.Income_scaled = scale(Total.Household.Income),
+    Total.Food.Expenditure_scaled = scale(Total.Food.Expenditure),
+    Household.Head.Age_scaled = scale(Household.Head.Age),
+    House.Floor.Area_scaled = scale(House.Floor.Area),
+    House.Age_scaled = scale(House.Age),
+    Total.Number.of.Family.members_scaled = scale(Total.Number.of.Family.members)
+  )
+```
+
+```{r}
+#| label: data-split
+# 划分数据：80% 训练集，20% 测试集
+set.seed(5555)
+trainIndex <- createDataPartition(
+  data_scaled$Total.Number.of.Family.members_scaled,  # 确保列名正确
+  p = 0.8,
+  list = FALSE
+)
+
+train_data <- data_scaled[trainIndex, ]
+test_data <- data_scaled[-trainIndex, ]
+```
+
+# Introduction {#sec-Intro}
+
+
+# Exploratory Data Analysis {#sec-EDA}
+
+```{r}
+#| label: response-analysis
+# 目标变量分布
+ggplot(data, aes(x = Total.Number.of.Family.members)) +
+  geom_histogram(bins = 15, fill = "blue", color = "black") +
+  ggtitle("Distribution of Household Size") +
+  xlab("Number of Family Members") +
+  ylab("Frequency")
+
+```
+
+```{r}
+
+# 计算均值和方差
+mean_val <- mean(data$Total.Number.of.Family.members)
+var_val <- var(data$Total.Number.of.Family.members)
+variance_mean_ratio <- var_val / mean_val
+summary_table <- data.frame(
+  Statistic = c("Mean", "Variance", "Variance/Mean Ratio"),
+  Value = c(mean_val, var_val, variance_mean_ratio)
+)
+summary_table |>
+  gt() |>
+  fmt_number(
+    columns = c("Value"),
+    decimals = 2  
+  ) |>
+  cols_label(
+    Statistic = html("Statistic"),
+    Value = html("Value")
+  )
+
+```
+
+#分类变量与家庭规模的关系
+
+```{r} 
+#| label: household-size-by-head-sex
+# Household size by household head's sex 性别
+ggplot(data, aes(x = Household.Head.Sex, y = Total.Number.of.Family.members, fill = Household.Head.Sex)) + 
+  geom_boxplot() +
+  ggtitle("Household Size by Household Head's Sex") +
+  xlab("Household Head's Sex") +
+  ylab("Number of Family Members") 
+
+
+#| label: household-size-by-type
+# Household size by type of household 家庭类型
+ggplot(data, aes(x = Type.of.Household, y = Total.Number.of.Family.members, fill = Type.of.Household)) + 
+  geom_boxplot() +
+  ggtitle("Household Size by Type of Household") +
+  xlab("Type of Household") +
+  ylab("Number of Family Members") +
+  theme(axis.text.x = element_text(angle = 15, hjust = 1))
+
+#| label: household-size-by-Electricity
+# Household Size by Electricity Access 电
+ggplot(data, aes(x = Electricity, y = Total.Number.of.Family.members)) +
+  geom_boxplot() +
+  labs(title = "Household Size by Electricity Access",
+       x = "Has Electricity (1=Yes, 0=No)",
+       y = "Number of Family Members") 
+
+```
+
+#连续变量与家庭规模的关系
+
+```{r}
+ #| label: household-size-vs-income 
+# Household size vs. household income
+income_boxplot <- data %>%
+  mutate(Income.Group = cut(Total.Household.Income, 
+                           breaks = quantile(Total.Household.Income, probs = seq(0, 1, by = 0.25)), labels = c("Low Income", "Lower Middle", "Upper Middle", "High Income"), include.lowest = TRUE)) %>%
+  ggplot(aes(x = Income.Group, y = Total.Number.of.Family.members, fill = Income.Group)) +
+  geom_boxplot() +
+  labs(title = "Household Size by Income Level",
+       x = "Income Group",
+       y = "Number of Family Members") +
+  theme(legend.position = "none")
+print(income_boxplot)
+```
+
+
+```{r}
+#| label: household-size-vs-Food Expenditure
+#  Food Expenditure vs Household Size
+food_exp_by_family_size <- data %>%
+  # Create family size groups
+  mutate(Family.Size.Group = cut(Total.Number.of.Family.members, 
+                    breaks = c(0, 2, 4, 6, 8, 20),)) %>%
+  ggplot(aes(x = Family.Size.Group, y = Total.Food.Expenditure, fill = Family.Size.Group)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(title = "Food Expenditure by Household Size",
+       x = "Household Size",
+       y = "Total Food Expenditure (Philippine Peso)") +
+  scale_y_continuous(labels = scales::comma) +
+  theme_minimal() +
+  theme(legend.position = "none")
+print(food_exp_by_family_size)
+```
+
+
+```{r}
+#| label: household-size-vs-head's age
+# Household size vs. household head's age
+head_age_line <- data %>% 
+  # Create simpler age groups (decades instead of 5-year groups)
+  mutate(Age.Group = cut(Household.Head.Age, 
+                         breaks = c(20, 30, 40, 50, 60, 80),
+                         labels = c("20-29", "30-39", "40-49", "50-59", "60+"),
+                         include.lowest = TRUE)) %>%
+  # Group and calculate means
+  group_by(Age.Group) %>%
+  summarise(Mean.Family.Size = mean(Total.Number.of.Family.members, na.rm = TRUE)) %>%
+  # Create the plot
+  ggplot(aes(x = Age.Group, y = Mean.Family.Size, group = 1)) +
+  geom_line(color = "blue", size = 1) +
+  geom_point(color = "red", size = 3) +
+  labs(title = "Household Head Age vs Average Household Size",
+       x = "Age Group", 
+       y = "Average Family Size") 
+
+print(head_age_line)
+```
+
+```{r}
+#| label: household-size-vs-bedrooms
+# Household size vs. number of bedrooms
+ggplot(data, aes(x = as.factor(Number.of.bedrooms), y = Total.Number.of.Family.members, fill = as.factor(Number.of.bedrooms))) + 
+  geom_boxplot() +
+  ggtitle("Household Size vs. Number of Bedrooms") +
+  xlab("Number of Bedrooms") +
+  ylab("Number of Family Members") 
+```
+
+```{r}
+#| label: household-size-vs-Floor Area
+#  Floor Area vs Household Size Line Chart
+floor_area_simple <- data %>%
+  # Create simple floor area groups with round numbers
+  mutate(Floor.Area.Group = cut(House.Floor.Area, 
+                  breaks = c(0, 50, 100, 150, Inf),)) %>%
+  group_by(Floor.Area.Group) %>%
+  summarise(Mean.Family.Size = mean(Total.Number.of.Family.members, na.rm = TRUE)) %>%
+  ggplot(aes(x = Floor.Area.Group, y = Mean.Family.Size, group = 1)) +
+  geom_line(color = "blue") +
+  geom_point(color = "red") +
+  labs(title = "Floor Area vs Family Size",
+       x = "Floor Area (sq.m)", 
+       y = "Average Family Size") 
+print(floor_area_simple)
+```
+
+```{r}
+#| label: household-size-vs-House Age
+# Simplified House Age vs Household Size Line Chart
+house_age_line <- data %>%
+  # Create decade-based age groups (0-10, 10-20, etc.)
+  mutate(House.Age.Group = cut(House.Age, 
+              breaks = c(0, 10, 20, 30, 40, 100),
+      labels = c("0-10", "10-20", "20-30", "30-40", "40+"),
+                              include.lowest = TRUE)) %>%
+  # Group and calculate means
+  group_by(House.Age.Group) %>%
+  summarise(Mean.Family.Size = mean(Total.Number.of.Family.members, na.rm = TRUE)) %>%
+  # Create basic plot
+  ggplot(aes(x = House.Age.Group, y = Mean.Family.Size, group = 1)) +
+  geom_line(color = "blue") +
+  geom_point(color = "red") +
+  labs(title = "House Age vs Family Size",
+       x = "House Age (years)", 
+       y = "Average Family Size") 
+print(house_age_line)
+```
+
+#Formal analytics
+
+```{r}
+#| label: poisson-model
+# 训练泊松回归模型
+poisson_model <- glm(Total.Number.of.Family.members ~ Total.Household.Income_scaled + Household.Head.Age_scaled + House.Floor.Area_scaled + House.Age_scaled + Number.of.bedrooms + Household.Head.Sex + Type.of.Household + Electricity, family = poisson, data = train_data)
+
+# 查看模型摘要
+summary(poisson_model)
+```
+
+```{r}
+#| label: nb-model
+# 训练负二项回归模型
+nb_model <- glm.nb(Total.Number.of.Family.members ~ Total.Household.Income_scaled + Household.Head.Age_scaled + House.Floor.Area_scaled + House.Age_scaled + Number.of.bedrooms + Household.Head.Sex + Type.of.Household + Electricity, data = train_data)
+
+# 查看模型摘要
+summary(nb_model)
+```
+
+```{r}
+#| label: model-comparison
+# 比较模型 AIC
+aic_comparison <- data.frame(
+  Model = c("Poisson", "Negative Binomial"),
+  AIC = c(AIC(poisson_model), AIC(nb_model))
+)
+
+# 显示 AIC 比较
+kable(aic_comparison, caption = "AIC Comparison of Poisson and Negative Binomial Models")
+
+# 计算 R² 作为模型评估标准
+r2_poisson <- r2(poisson_model)
+r2_nb <- r2(nb_model)
+
+# 比较 R² 结果
+r2_comparison <- data.frame(
+  Model = c("Poisson", "Negative Binomial"),
+  R2 = c(r2_poisson, r2_nb)
+)
+
+# 显示 R² 比较
+kable(r2_comparison, caption = "R-squared Comparison of Models")
+```
+
+```{r}
+#| label: model-diagnostics
+# 诊断泊松模型
+par(mfrow = c(2, 2))
+plot(poisson_model, main = "Poisson Model Diagnostics")
+
+# 诊断负二项模型
+plot(nb_model, main = "Negative Binomial Model Diagnostics")
+
+```
+
+```{r}
+# 过度离散性检验
+summary_poisson <- summary(poisson_model)
+dispersion <- summary_poisson$dispersion
+cat("模型分散参数（来自 summary）:", dispersion, "\n")
+
+```
+最佳模型是泊松。
+极大的 theta 值：负二项式模型估计的 theta 约为 72,725，标准误差为 305,952。当 theta 接近无穷大时，负二项分布收敛为 Poisson 分布。
+模型等价性：这解释了为什么两个模型产生几乎相同的系数 - 负二项式基本上被简化为 Poisson 模型，因为数据中的过度离散最小。
+AIC 对齐方式：泊松模型的 AIC 略低（5834.9 对 5836.9）证实了更简单的泊松模型更合适。
+
+```{r}
+#| label: model-prediction
+# 预测测试数据
+test_data$poisson_pred <- predict(poisson_model, test_data, type = "response")
+test_data$nb_pred <- predict(nb_model, test_data, type = "response")
+
+#| label: prediction-plot
+# 可视化真实值 vs 预测值
+ggplot(test_data, aes(x = Total.Number.of.Family.members)) +
+  geom_histogram(aes(y = ..density..), binwidth = 1, fill = "lightblue", color = "black") +
+  geom_density(aes(x = poisson_pred), color = "red", linetype = "dashed") +
+  geom_density(aes(x = nb_pred), color = "green") +
+  labs(title = "Actual vs Predicted Counts", x = "Number of Family Members", y = "Density")
+```
+
+
