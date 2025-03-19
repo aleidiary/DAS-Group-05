@@ -20,13 +20,13 @@ execute:
 
 ```{r}
 #| label: libraries
-library(tidyverse)    # 数据操作
-library(MASS)         # 负二项回归
-library(AER)          # 过度离散检验
-library(caret)        # 数据分割
-library(knitr)        # 生成表格
-library(performance)  # 模型评估
-library(ggplot2)      # 可视化
+library(tidyverse)   
+library(MASS)         
+library(AER)          
+library(caret)        
+library(knitr)        
+library(performance)  
+library(ggplot2)      
 library(dplyr)
 ```
 
@@ -37,7 +37,6 @@ data <- read.csv("C:/Users/25094/Desktop/skills/project2/dataset05.csv", strings
 
 ```{r}
 #| label: data tidy
-# 转换分类变量 1111111111112222222222
 data <- data %>%
   mutate(
     Region = as.factor(Region),
@@ -45,8 +44,6 @@ data <- data %>%
     Type.of.Household = as.factor(Type.of.Household),
     Electricity = as.factor(Electricity)
   )
-
-# 确保数值变量格式正确
 data <- data %>%
   mutate(
     Total.Household.Income = as.numeric(Total.Household.Income),
@@ -57,39 +54,10 @@ data <- data %>%
     House.Age = as.numeric(House.Age),
     Number.of.bedrooms = as.numeric(Number.of.bedrooms)
   )
-# 检查数据摘要
 summary(data)
 
-# 检查缺失值
+# Check for missing values
 cat("Number of missing values:", sum(is.na(data)), "\n")
-```
-
-```{r}
-#| label: data-scaling
-# 对连续变量进行标准化
-data_scaled <- data %>%
-  mutate(
-    Total.Household.Income_scaled = scale(Total.Household.Income),
-    Total.Food.Expenditure_scaled = scale(Total.Food.Expenditure),
-    Household.Head.Age_scaled = scale(Household.Head.Age),
-    House.Floor.Area_scaled = scale(House.Floor.Area),
-    House.Age_scaled = scale(House.Age),
-    Total.Number.of.Family.members_scaled = scale(Total.Number.of.Family.members)
-  )
-```
-
-```{r}
-#| label: data-split
-# 划分数据：80% 训练集，20% 测试集
-set.seed(5555)
-trainIndex <- createDataPartition(
-  data_scaled$Total.Number.of.Family.members_scaled,  # 确保列名正确
-  p = 0.8,
-  list = FALSE
-)
-
-train_data <- data_scaled[trainIndex, ]
-test_data <- data_scaled[-trainIndex, ]
 ```
 
 # Introduction {#sec-Intro}
@@ -99,7 +67,7 @@ test_data <- data_scaled[-trainIndex, ]
 
 ```{r}
 #| label: response-analysis
-# 目标变量分布
+# response-analysis
 ggplot(data, aes(x = Total.Number.of.Family.members)) +
   geom_histogram(bins = 15, fill = "blue", color = "black") +
   ggtitle("Distribution of Household Size") +
@@ -109,8 +77,7 @@ ggplot(data, aes(x = Total.Number.of.Family.members)) +
 ```
 
 ```{r}
-
-# 计算均值和方差
+# response-numerical analysis
 mean_val <- mean(data$Total.Number.of.Family.members)
 var_val <- var(data$Total.Number.of.Family.members)
 variance_mean_ratio <- var_val / mean_val
