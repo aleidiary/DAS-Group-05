@@ -355,6 +355,20 @@ ggplot(test_data, aes(x = Total.Number.of.Family.members)) +
   labs(title = "Actual vs Predicted Counts", x = "Number of Family Members", y = "Density")
 ```
 
+```{r}
+#| label: model-prediction
+# 预测测试数据
+test_data$poisson_pred <- predict(poisson_model, test_data, type = "response")
+test_data$nb_pred <- predict(nb_model, test_data, type = "response")
+
+#| label: prediction-plot
+# 可视化真实值 vs 预测值
+ggplot(test_data, aes(x = Total.Number.of.Family.members)) +
+  geom_histogram(aes(y = ..density..), binwidth = 1, fill = "lightblue", color = "black") +
+  geom_density(aes(x = poisson_pred), color = "red", linetype = "dashed") +
+  geom_density(aes(x = nb_pred), color = "green") +
+  labs(title = "Actual vs Predicted Counts", x = "Number of Family Members", y = "Density")
+```
 
 
 
