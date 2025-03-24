@@ -1,4 +1,3 @@
-
 ---
 title: "Analysis of Factors Influencing Household Size in the Philippines"
 author: "Group 5"
@@ -40,7 +39,7 @@ library(pscl)
 
 ```{r}
 #| label: data
-data <- read.csv("C:/Users/25094/Desktop/skills/project2/dataset05.csv", stringsAsFactors = FALSE)
+data <- read.csv("~/Desktop/DAS-Group-05/dataset05.csv", stringsAsFactors = FALSE)
 ```
 
 ```{r}
@@ -349,7 +348,7 @@ Most people tend to live in houses under 20 years old, while homes older than 20
 
 ```{r}
 #| label: full-poisson
-# Poisson Full Model
+
 poisson_full_model <- glm(
   Total.Number.of.Family.members ~
     Total.Household.Income +
@@ -430,12 +429,10 @@ Most of the variables are significant and the model is valid, but it can still b
 
 ```{r}
 #| label: stepwise-selection
-# Step-by-step variable filtering using step
-selected_model1 <- step(poisson_full_model, direction = "backward", trace = TRUE)
 
+selected_model1 <- step(poisson_full_model, direction = "backward", trace = TRUE)
 summary(selected_model1)
 
-# View the AIC of the filtered model
 cat("AIC of the selected model:", AIC(selected_model1), "\n")
 ```
 
@@ -465,17 +462,14 @@ The final model realized the streamlining of variables while maintaining high ex
 
 ```{r}
 #| label: check-dispersion
-# Calculate the Pearson residual sum of squares
 dispersion_ratio <- sum(residuals(selected_model1, type = "pearson")^2) / selected_model1$df.residual
 cat("Dispersion ratio:", dispersion_ratio, "\n")
 
-# Test for excessive discretisation
 if (dispersion_ratio > 1.5) {
   cat("There is evidence of overdispersion. Consider using a Negative Binomial Model.\n")
 } else {
   cat("No significant overdispersion detected. Poisson model is appropriate.\n")
 }
-
 ```
 
 In testing the final Poisson regression model for excessive dispersion, we used the ratio of the Pearson residual sum of squares to the residual degrees of freedom to calculate the dispersion ratio.
@@ -485,11 +479,11 @@ Therefore, the Poisson model currently used is reasonable and there is no need t
 The model performs well in terms of both data fitting and assumptions, with stability and interpretability.
 
 ```{r}
-#| label: model-evaluation
-# Predicted fitted values
+#| fig-cap: Plotting fitted values against true values
+#| label: fig-11
+
 data$pred_poisson <- predict(selected_model1, type = "response")
 
-# Plotting fitted values against true values
 ggplot(data, aes(x = Total.Number.of.Family.members, y = pred_poisson)) +
   geom_point(alpha = 0.5, color = "blue") +
   ggtitle("Poisson Predictions vs. Actual Total.Number.of.Family.members") +
@@ -497,7 +491,6 @@ ggplot(data, aes(x = Total.Number.of.Family.members, y = pred_poisson)) +
   ylab("Predicted HTotal.Number.of.Family.members(Poisson)") +
   theme_minimal()
 
-# Calculate the mean square error (MSE)
 mse_poisson <- mean((data$Total.Number.of.Family.members - data$pred_poisson)^2)
 cat("Mean Squared Error (MSE) of Poisson Model:", mse_poisson, "\n")
 ```
@@ -510,16 +503,22 @@ Further, the prediction accuracy was measured by the Mean Squared Error (MSE) me
 Although there are individual households with a high number of members (e.g., more than 12) with large deviations from the predicted values, the overall error level is within the acceptable range, and the model's prediction performance is stable.
 
 ```{r}
-#| label: residuals-analysis
-# Plotting residual distributions
+#| fig-cap: Histogram of Pearson residual distribution
+#| label: fig-12
+
 ggplot(data.frame(resid_poisson = residuals(selected_model1, type = "pearson")),
        aes(x = resid_poisson)) +
   geom_histogram(bins = 30, fill = "pink", color = "black") +
   ggtitle("Residuals Distribution of Poisson Model") +
   xlab("Pearson Residuals") +
   theme_minimal()
+```
 
-# Standardised residuals vs. fitted values
+
+```{r}
+#| fig-cap: Scatterplot of residuals vs. fitted values
+#| label: fig-13
+
 plot(selected_model1$fitted.values, 
      residuals(selected_model1, type = "pearson"),
      xlab = "Fitted Values",
@@ -528,16 +527,16 @@ plot(selected_model1$fitted.values,
 abline(h = 0, col = "red", lwd = 2)
 ```
 
-## Figure 1: Histogram of Pearson residual distribution
+## Pearson residual distribution analysis
 
-This figure shows the Pearson residual distribution of the Poisson regression model.
+@fig-12 shows the Pearson residual distribution of the Poisson regression model.
 The overall residuals are approximately normally distributed, mainly concentrated around 0, indicating that most of the deviations between the predicted and actual values are small.
 Although there is a slight long tail on the right side, no significant skewness or abnormal pattern is found.
 This indicates that the model is fitted more accurately, there is no obvious systematic error, and the residual structure supports the basic assumptions of the model.
 
-## Figure 2: Scatterplot of residuals vs. fitted values
+## Residuals vs. fitted values diagnostic
 
-This figure shows the relationship between the Pearson residuals and the fitted values of the model.
+@fig-13 shows the relationship between the Pearson residuals and the fitted values of the model.
 The residuals are roughly randomly distributed around the zero line, with no funnel-shaped distribution or curvilinear trend, indicating that the model does not suffer from severe heteroskedasticity or fitting bias.
 The dense region of points is concentrated in the small and medium fitted value intervals, reflecting the characteristics of the data itself, but not destroying the model robustness.
 Overall, the distribution of residuals is consistent with the assumptions of the Poisson regression model, further supporting the model's goodness of fit and suitability for explaining changes in the number of family members.
@@ -559,10 +558,7 @@ nb_model <- glm.nb(
 )
 
 selected_model2 <- step(poisson_full_model, direction = "backward", trace = TRUE)
-
 summary(selected_model2)
-
-
 ```
 
 In order to further verify the reasonableness of the model, we introduced the Negative Binomial Regression (NBR) model for comparative analysis after fitting the Poisson regression.
@@ -576,4 +572,10 @@ Combined with the previous excessive dispersion test (dispersion ratio = 0.726 \
 
 In addition, the estimated values of most key variables (e.g., household income, food expenditure, age of the household head, gender of the household head, etc.) in the two models are consistent with the significance levels, which further supports the robustness of the models.
 
+# Conclusion 
+Based on the analysis of data from 1,788 households, we found that most families consist of 3 to 6 members. 
+
+The key factors influencing household size include Household Income, Food Expenditure, Household Head Age, House Age, Type of Household, and Household Head Sex.Households with higher income tend to form smaller nuclear families, while food expenditure serves as an important indicator of larger family sizes. The age and sex of the household head reflect different stages in the family life cycle, with older or male heads often associated with larger households. Extended family structures are more likely to accommodate a greater number of members. In contrast, Floor Area, Number of Bedrooms, and Electricity have relatively little impact and are not the core determinants of household size.
+
+These findings suggest that household size is influenced by a combination of economic capacity, housing resources, and demographic characteristics, as well as the structural composition of the family itself.
 
