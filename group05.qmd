@@ -1,3 +1,4 @@
+
 ---
 title: "Analysis of Factors Influencing Household Size in the Philippines"
 author: "Group 5"
@@ -574,3 +575,5 @@ The results show that the AIC value of the negative binomial model is 7115.5, wh
 Combined with the previous excessive dispersion test (dispersion ratio = 0.726 \< 1.5) and residual plot analysis, the Poisson model did not show obvious dispersion problems, and the model residuals were well-distributed and stable, so we believe that the Poisson model is sufficient to explain the characteristics of the present data, and the structure of the model is more concise.
 
 In addition, the estimated values of most key variables (e.g., household income, food expenditure, age of the household head, gender of the household head, etc.) in the two models are consistent with the significance levels, which further supports the robustness of the models.
+
+

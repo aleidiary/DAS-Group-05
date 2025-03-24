@@ -1,0 +1,188 @@
+---
+title: "draft3"
+format: html
+editor: visual
+---
+
+```{r}
+#| label: data-import
+# 加载必要的包
+library(tidyverse)
+library(MASS)
+library(car)
+library(pscl)
+```
+
+You can add options to executable code like this
+
+```{r}
+# 读取数据
+df <- read.csv("C:/Users/10754/Desktop/dataset05.csv", stringsAsFactors = FALSE)
+
+# 数据预处理
+df <- df %>%
+  mutate(
+    Region = as.factor(Region),
+    Household.Head.Sex = as.factor(Household.Head.Sex),
+    Type.of.Household = as.factor(Type.of.Household),
+    Electricity = as.factor(Electricity),
+    Total.Household.Income = as.numeric(Total.Household.Income),
+    Total.Food.Expenditure = as.numeric(Total.Food.Expenditure),
+    Household.Head.Age = as.numeric(Household.Head.Age),
+    Total.Number.of.Family.members = as.numeric(Total.Number.of.Family.members),
+    House.Floor.Area = as.numeric(House.Floor.Area),
+    House.Age = as.numeric(House.Age),
+    Number.of.bedrooms = as.numeric(Number.of.bedrooms)
+  )
+
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
+
+```{r}
+# 检查缺失值
+cat("Missing values in data:", sum(is.na(df)), "\n")
+
+# 检查数据结构
+str(df)
+```
+
+```{r}
+#| label: eda
+# 目标变量基本统计信息
+summary(df$Total.Number.of.Family.members)
+
+# 目标变量分布直方图
+ggplot(df, aes(x = Total.Number.of.Family.members)) +
+  geom_histogram(bins = 20, fill = "skyblue", color = "black") +
+  ggtitle("Distribution of Household Size") +
+  xlab("Number of Family Members") +
+  ylab("Frequency") +
+  theme_minimal()
+```
+
+```{r}
+#| label: full-poisson
+# 构建 Poisson Full Model
+poisson_full_model <- glm(
+  Total.Number.of.Family.members ~
+    Total.Household.Income +
+    Total.Food.Expenditure +
+    Household.Head.Age +
+    Number.of.bedrooms +
+    House.Floor.Area +
+    House.Age +
+    Type.of.Household +
+    Electricity +
+    Household.Head.Sex,
+  family = poisson, data = df
+)
+
+# 查看 Full Model 结果
+summary(poisson_full_model)
+```
+
+```{r}
+#| label: stepwise-selection
+# 使用 step 进行逐步变量筛选
+poisson_selected_model <- step(poisson_full_model, direction = "backward", trace = TRUE)
+
+# 查看筛选后的模型
+summary(poisson_selected_model)
+
+# 查看筛选后模型的 AIC
+cat("AIC of the selected model:", AIC(poisson_selected_model), "\n")
+```
+
+```{r}
+#| label: check-dispersion
+# 计算 Pearson 残差平方和
+#Poisson 模型假设均值等于方差，但如果方差远大于均值，则需要用负二项回归来替代
+dispersion_ratio <- sum(residuals(poisson_selected_model, type = "pearson")^2) / poisson_selected_model$df.residual
+cat("Dispersion ratio:", dispersion_ratio, "\n")
+
+# 检验是否存在过度离散 
+if (dispersion_ratio > 1.5) {
+  cat("There is evidence of overdispersion. Consider using a Negative Binomial Model.\n")
+} else {
+  cat("No significant overdispersion detected. Poisson model is appropriate.\n")
+}
+
+```
+
+```{r}
+#| label: model-evaluation
+# 预测拟合值
+df$pred_poisson <- predict(poisson_selected_model, type = "response")
+
+# 绘制拟合值与真实值的关系
+ggplot(df, aes(x = Total.Number.of.Family.members, y = pred_poisson)) +
+  geom_point(alpha = 0.5, color = "blue") +
+  ggtitle("Poisson Predictions vs. Actual Total.Number.of.Family.members") +
+  xlab("Actual Total.Number.of.Family.members") +
+  ylab("Predicted HTotal.Number.of.Family.members(Poisson)") +
+  theme_minimal()
+#这里预测的Actual Household Size其实就是家庭成员数
+# 计算均方误差 (MSE) 
+mse_poisson <- mean((df$Total.Number.of.Family.members - df$pred_poisson)^2)
+cat("Mean Squared Error (MSE) of Poisson Model:", mse_poisson, "\n")
+```
+
+```{r}
+#| label: residuals-analysis
+# 残差模型诊断
+# 绘制残差分布直方图
+ggplot(data.frame(resid_poisson = residuals(poisson_selected_model, type = "pearson")),
+       aes(x = resid_poisson)) +
+  geom_histogram(bins = 30, fill = "pink", color = "black") +
+  ggtitle("Residuals Distribution of Poisson Model") +
+  xlab("Pearson Residuals") +
+  theme_minimal()
+
+# 绘制残差与拟合值的关系图
+plot(poisson_selected_model$fitted.values, 
+     residuals(poisson_selected_model, type = "pearson"),
+     xlab = "Fitted Values",
+     ylab = "Pearson Residuals",
+     main = "Residuals vs. Fitted Values")
+abline(h = 0, col = "red", lwd = 2)
+```
+
+```{r}
+# 加载必要的包
+library(MASS)
+
+# 负二项模型拟合
+nb_model <- glm.nb(
+  Total.Number.of.Family.members ~
+    Total.Household.Income +
+    Total.Food.Expenditure +
+    Household.Head.Age +
+    Number.of.bedrooms +
+    House.Floor.Area +
+    House.Age +
+    Type.of.Household +
+    Electricity +
+    Household.Head.Sex,
+  data = df
+)
+
+selected_model2 <- step(poisson_full_model, direction = "backward", trace = TRUE)
+
+# 查看筛选后的模型
+summary(selected_model2)
+
+
+```
+
+```{r}
+# 计算负二项模型的 MSE
+mse_nb <- mean((df$Total.Number.of.Family.members - df$pred_nb)^2)
+cat("Mean Squared Error (MSE) of Negative Binomial Model:", mse_nb, "\n")
+```
+
+```{r}
+# 计算过度离散比率
+overdispersion_ratio <- sum(residuals(poisson_selected_model, type = "pearson")^2) / df.residual(poisson_selected_model)
+cat("Overdispersion Ratio:", overdispersion_ratio, "\n")
+```
